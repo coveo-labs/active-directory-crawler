@@ -1,0 +1,22 @@
+{
+  "name": "active-directory-crawler",
+  "version": "1.0.0",
+  "description": "A crawler for the Active Directory that will push to an organization in Coveo cloud.",
+  "main": "crawlAD.js",
+  "scripts": {},
+  "keywords": [
+    "coveo",
+    "AD",
+    "active directory",
+    "crawler",
+    "cloud V2"
+  ],
+  "author": "Jerome Devost <jdevost@coveo.com> (https://github.com/coveo-labs/active-directory-crawler)",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "ldif": "^0.5.1",
+    "request": "^2.81.0",
+    "require": "^2.4.20"
+  },
+  "dependencies": {}
+}
