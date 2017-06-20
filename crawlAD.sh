@@ -12,5 +12,5 @@ rm -f temp/batch.json
 ldapsearch -LLL -H ldap://ldaphost.company.com -D "DOMAIN\username" -y user.password -u -b "ou=MAIN_ORG_UNIT,dc=example,dc=company,dc=com" "(ou=* Users)" > temp/groups.ldif
 
 
-node scripts/crawlAD.js
-node scripts/pushToSource.js
+node crawlAD.js
+node pushToSource.js
