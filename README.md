@@ -37,7 +37,6 @@ Net / openldap-server
    * Just make sure you edit its file properties so only you can see its content (`chmod 400`) or through File properties on Windows.
    * Is used by crawlAD.js also
 1. Edit config in `config.js`, set all your keys and LDAP info.
-1. Edit `crawlAD.sh` with your LDAP info too.
 
 
 ## Execution
