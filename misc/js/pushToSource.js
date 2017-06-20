@@ -1,6 +1,8 @@
-const config = require('./config'),
+const config = require('../config'),
   fs = require('fs'),
   request = require('request');
+
+const TEMP_FOLDER = './temp'; // relative to where 'node pushToSource.js' is executed
 
 // 1. Construct the batch file
 let buildBatchFile = (path, jsonFiles) => {
@@ -26,7 +28,7 @@ let buildBatchFile = (path, jsonFiles) => {
     });
 
   try {
-    fs.writeFileSync(`temp/batch.json`, JSON.stringify(files,null,2), err=>{console.log(err);});
+    fs.writeFileSync(`${TEMP_FOLDER}/batch.json`, JSON.stringify(files,null,2), err=>{console.log(err);});
   } catch (e){}
 
   return {AddOrUpdate: files};
@@ -115,9 +117,9 @@ let getLargeFileContainer = (batchFile)=> {
 
 
 let main = () => {
-  console.log('\n-------  \n Loading .json files from ./temp/users \n------- \n');
+  console.log(`\n-------  \n Loading .json files from ${TEMP_FOLDER}/users \n------- \n`);
 
-  let path = './temp/users/';
+  let path = `${TEMP_FOLDER}/users/`;
   fs.readdir(path, (err,items)=> {
     let jsonFiles = items.filter(item=> {
       if ( /\.json$/.test(item) ) {

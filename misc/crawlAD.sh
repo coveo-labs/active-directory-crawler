@@ -6,12 +6,12 @@ mkdir temp/users
 rm -f temp/users/*
 rm -f temp/batch.json
 
-node createConfigForBash.js
+node js/createConfigForBash.js
 source temp/config.sh
 
 ldapsearch -LLL -H ldap://$ldapHost -D "$ldapUser" -y ldapUser.password -u -b "$ldapMainGroup" "$ldapGroupFilter" > temp/groups.ldif
 
-node crawlAD.js
-node pushToSource.js
+node js/crawlAD.js
+node js/pushToSource.js
 
 rm -f temp/config.sh

@@ -1,8 +1,10 @@
 /**
  * Reads the config.js and generate temp/config.sh to be used by crawlAD.sh
  */
-const config = require('./config'),
+const config = require('../config'),
   fs = require('fs');
+
+const TEMP_FOLDER = './temp';
 
 let fileContent = '#!/usr/bin/env bash\n';
 Object.keys(config).forEach(key=>{
@@ -11,4 +13,4 @@ Object.keys(config).forEach(key=>{
   fileContent += `${key}="${value}"\n`;
 });
 
-fs.writeFileSync('./temp/config.sh', fileContent, 'utf-8');
+fs.writeFileSync(`${TEMP_FOLDER}/config.sh`, fileContent, 'utf-8');

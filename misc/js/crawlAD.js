@@ -1,8 +1,10 @@
-const config = require('./config'),
+const config = require('../config'),
   fs = require('fs'),
   ldif = require('ldif'),
   User = require('./User'),
   exec = require('child_process').exec;
+
+const TEMP_FOLDER = './temp'; // relative to where 'node crawlAD.js' is executed
 
 /**
  * Creates a user map as a helper to find users by emails or by their DN key.
@@ -61,7 +63,7 @@ let parseUsersOfAGroupFile = (groupFile, resolve)=> {
 };
 
 /**
- * Reads LDIF file temp/groups.ldif and query AD to get the users from each sub-group defined in temp/groups.ldif
+ * Reads LDIF file ../temp/groups.ldif and query AD to get the users from each sub-group defined in ../temp/groups.ldif
  * @param {string} groupsFile
  * @return {Promise} The promise is resolved once all the groups are processed.
  */
@@ -85,7 +87,7 @@ let parseGroupsFile = (groupsFile)=> {
       let o = record.toObject({decode:false}),
         dn = o.dn,
         ou = o.attributes.ou.replace(/\s+/g,'_'),
-        outfile = `./temp/${ou}.ldif`;
+        outfile = `${TEMP_FOLDER}/${ou}.ldif`;
 
       let cmd = `ldapsearch -LLL -H ldap://${config.ldapHost} -D "${config.ldapUser}" -y ldapUser.password -u -b "${dn}" '${config.ldapUsersFilter}' > ${outfile}`;
       execCmd(cmd, outfile);
@@ -178,7 +180,7 @@ let onAllUsersLoaded = (groups) => {
 
       try {
         let fileName = adUser.userPrincipalName.replace(/[^\w]/g, '_');
-        fs.writeFileSync(`./temp/users/${fileName}.json`, JSON.stringify(adUser, null, 2), 'utf-8');
+        fs.writeFileSync(`${TEMP_FOLDER}/users/${fileName}.json`, JSON.stringify(adUser, null, 2), 'utf-8');
       }
       catch(e) {}
 
@@ -186,7 +188,7 @@ let onAllUsersLoaded = (groups) => {
     }
     else {
       // 'adUser' is undefined, means we reach the end of the users to process.
-      let mapfile = `./temp/user_map.json`;
+      let mapfile = `${TEMP_FOLDER}/user_map.json`;
       console.log('Done. Writing map to ', mapfile);
 
       let keys = userMap.getAllEmails();
@@ -212,7 +214,7 @@ let onAllUsersLoaded = (groups) => {
 
 let main = () => {
   console.log('\n-------  \n Step 1 - loading info from Active Directory \n------- \n');
-  parseGroupsFile('./temp/groups.ldif').then( onAllUsersLoaded );
+  parseGroupsFile(`${TEMP_FOLDER}/groups.ldif`).then( onAllUsersLoaded );
 };
 
 main();

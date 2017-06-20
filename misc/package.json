@@ -12,7 +12,7 @@
     "cloud V2"
   ],
   "author": "Jerome Devost <jdevost@coveo.com> (https://github.com/coveo-labs/active-directory-crawler)",
-  "license": "Apache-2.0",
+  "license": "GPL-3.0",
   "devDependencies": {
     "ldif": "^0.5.1",
     "request": "^2.81.0",
