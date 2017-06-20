@@ -1,4 +1,4 @@
-const config = require('../config'),
+const config = require('./config'),
   fs = require('fs'),
   request = require('request');
 
@@ -26,7 +26,7 @@ let buildBatchFile = (path, jsonFiles) => {
     });
 
   try {
-    fs.writeFile(`temp/batch.json`, JSON.stringify(files,null,2), err=>{console.log(err);});
+    fs.writeFileSync(`temp/batch.json`, JSON.stringify(files,null,2), err=>{console.log(err);});
   } catch (e){}
 
   return {AddOrUpdate: files};
@@ -59,14 +59,17 @@ let sendPushApiRequest = (method, action) => {
         }
       });
   });
-}
+};
 
 let changeSourceStatus = (statusType) => {
   return sendPushApiRequest(`POST`, `status?statusType=${statusType}`);
-}
+};
 
 // 4. Send request to process the BATCH
 let sendBatchRequest = (fileId) => {
+
+  console.log('\n-------  \n Sending Push request \n------- \n');
+
   // Send PUT https://push.cloud.coveo.com/v1/organizations/${config.org}/sources/${config.source}/documents/batch?fileId=myfileid
   let now = Date.now(),
     olderThanThreshold = now - (2.2 * 86400000); //delete documents older than about 50 hours, 86400000 is one day (24*60*60*1000)
@@ -80,6 +83,7 @@ let sendBatchRequest = (fileId) => {
 
 // 3. Upload the batch file to AWS
 let sendBatchFileToAWS = (uploadUri, fileId, batchFile) => {
+  console.log('\n-------  \n Uploading batch.json to Amazon S3 \n------- \n');
   request.put({
     url: uploadUri,
     headers: {
@@ -96,6 +100,8 @@ let sendBatchFileToAWS = (uploadUri, fileId, batchFile) => {
 };
 
 let getLargeFileContainer = (batchFile)=> {
+  console.log('\n-------  \n Getting file container \n------- \n');
+
   // 2. Send POST request to get a large file container (uploadUri and fileId).
   return sendPushApiRequest(`POST`, `https://${config.platform}/v1/organizations/${config.org}/files`).then(
     body=>{
@@ -109,6 +115,8 @@ let getLargeFileContainer = (batchFile)=> {
 
 
 let main = () => {
+  console.log('\n-------  \n Loading .json files from ./temp/users \n------- \n');
+
   let path = './temp/users/';
   fs.readdir(path, (err,items)=> {
     let jsonFiles = items.filter(item=> {
@@ -119,6 +127,7 @@ let main = () => {
       return false;
     });
 
+    console.log('\n-------  \n Prepare batch.json \n------- \n');
     // 1. Construct the batch file
     let batchFile = buildBatchFile(path, jsonFiles);
 

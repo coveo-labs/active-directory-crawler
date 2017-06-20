@@ -1,9 +1,12 @@
-const config = require('../config'),
+const config = require('./config'),
   fs = require('fs'),
   ldif = require('ldif'),
   User = require('./User'),
   exec = require('child_process').exec;
 
+/**
+ * Creates a user map as a helper to find users by emails or by their DN key.
+ */
 let userMap = (()=> {
   this._email = {};
   this._dn = {};
@@ -30,6 +33,11 @@ let userMap = (()=> {
   };
 })();
 
+/**
+ * Reads a LDIF file to get users for one group
+ * @param {string} groupFile
+ * @param {function} resolve Promise callback
+ */
 let parseUsersOfAGroupFile = (groupFile, resolve)=> {
   try {
     let parseUsers = ldif.parseFile(groupFile),
@@ -52,15 +60,15 @@ let parseUsersOfAGroupFile = (groupFile, resolve)=> {
   }
 };
 
-// Return a promise. The promise is resolved once all the groups are processed.
-
 /**
- * reads temp/groups.ldif and query AD to get the users from each group
+ * Reads LDIF file temp/groups.ldif and query AD to get the users from each sub-group defined in temp/groups.ldif
  * @param {string} groupsFile
+ * @return {Promise} The promise is resolved once all the groups are processed.
  */
 let parseGroupsFile = (groupsFile)=> {
   let file = ldif.parseFile(groupsFile),
     record = null;
+
   return new Promise((resolve)=>{
     let promises = [],
       execCmd = (cmd, outfile) => {
@@ -79,8 +87,7 @@ let parseGroupsFile = (groupsFile)=> {
         ou = o.attributes.ou.replace(/\s+/g,'_'),
         outfile = `./temp/${ou}.ldif`;
 
-      let cmd = `ldap://${config.ldapHost} -D "${config.ldapUser}" -y ldapUser.password -u -b "${dn}" "${config.ldapUsersFilter}" > ${outfile}`;
-
+      let cmd = `ldapsearch -LLL -H ldap://${config.ldapHost} -D "${config.ldapUser}" -y ldapUser.password -u -b "${dn}" '${config.ldapUsersFilter}' > ${outfile}`;
       execCmd(cmd, outfile);
     }
 
@@ -106,6 +113,10 @@ let createUser = (user) => {
   return u;
 };
 
+/**
+ * Helper function to return the email of a users based on it's DN key. Useful for array functions like map().
+ * @param {string} dn
+ */
 let mapEmailToDN = dn=>{
   let u = userMap.get(dn);
   if ( !(u && u.userPrincipalName) ){
@@ -114,75 +125,83 @@ let mapEmailToDN = dn=>{
   return (u && u.userPrincipalName) || dn;
 };
 
+/**
+ * Process the LDIF info for all users, after all the groups LDIF files were loaded.
+ * @param {object[]} groups
+ */
 let onAllUsersLoaded = (groups) => {
-  console.log('\n ------  \n Step 1 - loading groups \n------- \n');
   groups.forEach(g=>{
     g.forEach( createUser );
   });
 
-  console.log('\n ------  \n Step 2 - users created \n------- \n');
+  console.log('\n-------  \n Step 2 - users created \n------- \n');
 
   let userEmails = userMap.getAllEmails().reverse();
 
-  console.log('\n ------  \n Step 3 - processing users \n------- \n');
+  console.log('\n-------  \n Step 3 - processing users \n------- \n');
 
   let nextUser = () => {
     let userKey = userEmails.pop(),
-      u = userMap.get(userKey);
+      adUser = userMap.get(userKey);
 
-    console.log(userKey);
-
-    if (u) {
+    if (adUser) {
       // we want to keep an hierarchy of the managers/direct reports. We are using emails to map them together.
-      u.managers = u.getManagers(userMap);
-      if (u.managers && u.managers.map) {
-        u.managers = u.managers.map( mapEmailToDN );
-        let managerUser = userMap.get( u.managers[0] );
+      adUser.managers = adUser.getManagers(userMap);
+      if (adUser.managers && adUser.managers.map) {
+        adUser.managers = adUser.managers.map( mapEmailToDN );
+        let managerUser = userMap.get( adUser.managers[0] );
         if (managerUser) {
-          u.admanagername = managerUser.name;
+          adUser.admanagername = managerUser.name;
         }
       }
 
-      if (u.directReports && !u.directReports.map) {
-        u.directReports = [u.directReports]; // in case we have one report only, it could be a string and not an array.
+      if (adUser.directReports && !adUser.directReports.map) {
+        adUser.directReports = [adUser.directReports]; // in case we have one report only, it could be a string and not an array.
       }
-      if (u.directReports && u.directReports.map) {
-        u.directReports = u.directReports.map( mapEmailToDN );
+      if (adUser.directReports && adUser.directReports.map) {
+        adUser.directReports = adUser.directReports.map( mapEmailToDN );
       }
 
-      let whenCreated = u.whenCreated;
+      let whenCreated = adUser.whenCreated;
       if ( /^(\d\d\d\d)(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/.test(whenCreated) ) {
-        u.createdDate = new Date( Date.UTC(RegExp.$1,parseInt(RegExp.$2,10)-1,RegExp.$3,RegExp.$4,RegExp.$5,RegExp.$6) ).toISOString();
+        adUser.createdDate = new Date( Date.UTC(RegExp.$1,parseInt(RegExp.$2,10)-1,RegExp.$3,RegExp.$4,RegExp.$5,RegExp.$6) ).toISOString();
       }
-      u.filetype = 'activedirperson';
+      adUser.filetype = 'activedirperson';
 
       // clean up some unused fields
       let reKeysToDelete = /^(thumbnailPhoto|mSMQ|msExch|msRTC)/;
-      Object.keys(u).forEach(k=>{
+      Object.keys(adUser).forEach(k=>{
         if ( reKeysToDelete.test(k) ) {
-          delete u[k];
+          delete adUser[k];
         }
       });
+
+      try {
+        let fileName = adUser.userPrincipalName.replace(/[^\w]/g, '_');
+        fs.writeFileSync(`./temp/users/${fileName}.json`, JSON.stringify(adUser, null, 2), 'utf-8');
+      }
+      catch(e) {}
+
+      nextUser();
     }
     else {
-      // 'u' is undefined, means we reach the end of the users to process.
+      // 'adUser' is undefined, means we reach the end of the users to process.
       let mapfile = `./temp/user_map.json`;
       console.log('Done. Writing map to ', mapfile);
 
       let keys = userMap.getAllEmails();
       let map = {};
-      keys.forEach( k=> {
-        let u = userMap.get(k);
-        map[k] = {
-          displayName: u.displayName,
-          dn: u.dn,
-          emailHash: u.emailHash,
-          key: k
+      keys.forEach( userEmail => {
+        let adUser = userMap.get(userEmail);
+        map[userEmail] = {
+          displayName: adUser.displayName,
+          dn: adUser.dn,
+          key: userEmail
         };
       });
 
       try {
-        fs.writeFile(mapfile, JSON.stringify(map,null,2), err=>{console.log(err);});
+        fs.writeFileSync(mapfile, JSON.stringify(map,null,2), err=>{console.log(err);});
       }
       catch(e) {}
     }
@@ -192,7 +211,7 @@ let onAllUsersLoaded = (groups) => {
 };
 
 let main = () => {
-  console.log('Get info from AD.', new Date().toLocaleTimeString('en-US',{hour12:false}));
+  console.log('\n-------  \n Step 1 - loading info from Active Directory \n------- \n');
   parseGroupsFile('./temp/groups.ldif').then( onAllUsersLoaded );
 };
 
